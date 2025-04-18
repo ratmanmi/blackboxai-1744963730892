@@ -1,0 +1,24 @@
+# Gestione richieste HTTP
+requests>=2.26.0
+
+# Gestione date e orari
+python-dateutil>=2.8.2
+
+# Logging
+logging>=0.5.1.2
+
+# Typing support
+typing>=3.7.4.3
+
+# Gestione retry
+tenacity>=8.0.1
+
+# Testing (opzionale)
+pytest>=6.2.5
+pytest-cov>=2.12.1
+
+# Gestione SSL
+urllib3>=1.26.7
+
+# JSON handling
+simplejson>=3.17.6
