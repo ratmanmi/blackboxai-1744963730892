@@ -1,0 +1,35 @@
+{
+    "infrastructure_code": "VEEAM-BACKUP",
+    
+    "veeam": {
+        "server": "https://veeam-server.example.com",
+        "client_id": "YOUR_CLIENT_ID",
+        "client_secret": "YOUR_CLIENT_SECRET",
+        "verify_ssl": false,
+        "retry": {
+            "max_attempts": 3,
+            "delay_seconds": 5
+        }
+    },
+    
+    "cmdbuild": {
+        "url": "https://cmdbuild-server.example.com/api",
+        "username": "admin",
+        "password": "admin",
+        "verify_ssl": true
+    },
+    
+    "logging": {
+        "level": "INFO",
+        "file": "/var/log/VeeamConnector/connector.log",
+        "max_size": 10485760,
+        "backup_count": 5,
+        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    },
+
+    "sync": {
+        "schedule": "0 2 * * *",
+        "timeout": 3600,
+        "batch_size": 100
+    }
+}
