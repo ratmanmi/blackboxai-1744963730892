@@ -1,0 +1,271 @@
+<h1 id="documentazione-connettore-veeam-per-cmdbuild">Documentazione Connettore Veeam per CMDBuild</h1>
+<h2 id="indice">Indice</h2>
+<ol type="1">
+<li><a href="#introduzione">Introduzione</a></li>
+<li><a href="#architettura">Architettura</a></li>
+<li><a href="#configurazione">Configurazione</a></li>
+<li><a href="#integrazione-con-cmdbuild">Integrazione con CMDBuild</a></li>
+<li><a href="#flusso-di-esecuzione">Flusso di Esecuzione</a></li>
+<li><a href="#gestione-errori">Gestione Errori</a></li>
+<li><a href="#manutenzione">Manutenzione</a></li>
+</ol>
+<h2 id="introduzione">Introduzione</h2>
+<p>Il connettore Veeam per CMDBuild è uno strumento Python che sincronizza automaticamente l’inventario di Veeam Backup &amp; Replication con l’asset management di CMDBuild. Lo script recupera informazioni su proxy, repository, job di backup e macchine virtuali da Veeam e le integra nell’asset management esistente.</p>
+<h3 id="caratteristiche-principali">Caratteristiche Principali</h3>
+<ul>
+<li>Sincronizzazione automatica via crontab</li>
+<li>Gestione intelligente dei server Veeam esistenti</li>
+<li>Logging dettagliato con rotazione</li>
+<li>Gestione errori con retry automatico</li>
+<li>Preservazione dei dati esistenti in CMDBuild</li>
+</ul>
+<h2 id="architettura">Architettura</h2>
+<h3 id="struttura-del-progetto">Struttura del Progetto</h3>
+<pre><code>veeam-connector/
+├── bin/
+│   └── sync_inventory.py    # Script principale
+├── lib/
+│   ├── veeam_client.py     # Client API Veeam
+│   ├── cmdb_client.py      # Client API CMDBuild
+│   └── cmdb_schema.py      # Schema dati CMDBuild
+├── config/
+│   └── config.json         # Configurazione
+├── logs/                   # Directory log
+└── requirements.txt        # Dipendenze Python</code></pre>
+<h3 id="componenti">Componenti</h3>
+<ol type="1">
+<li><strong>VeeamClient</strong> (lib/veeam_client.py)
+<ul>
+<li>Gestisce l’autenticazione OAuth2 con Veeam</li>
+<li>Recupera l’inventario completo</li>
+<li>Implementa retry automatico per le chiamate API</li>
+</ul></li>
+<li><strong>CMDBuildClient</strong> (lib/cmdb_client.py)
+<ul>
+<li>Gestisce l’autenticazione con CMDBuild</li>
+<li>Aggiorna l’asset management</li>
+<li>Gestisce le relazioni tra entità</li>
+</ul></li>
+<li><strong>CMDBSchema</strong> (lib/cmdb_schema.py)
+<ul>
+<li>Definisce la struttura dati in CMDBuild</li>
+<li>Valida i dati prima dell’inserimento</li>
+<li>Gestisce le relazioni tra classi</li>
+</ul></li>
+</ol>
+<h2 id="configurazione">Configurazione</h2>
+<h3 id="file-config.json">File config.json</h3>
+<div class="sourceCode" id="cb2"><pre class="sourceCode json"><code class="sourceCode json"><a class="sourceLine" id="cb2-1" title="1"><span class="fu">{</span></a>
+<a class="sourceLine" id="cb2-2" title="2">    <span class="dt">&quot;infrastructure_code&quot;</span><span class="fu">:</span> <span class="st">&quot;VEEAM-BACKUP&quot;</span><span class="fu">,</span></a>
+<a class="sourceLine" id="cb2-3" title="3">    </a>
+<a class="sourceLine" id="cb2-4" title="4">    <span class="dt">&quot;veeam&quot;</span><span class="fu">:</span> <span class="fu">{</span></a>
+<a class="sourceLine" id="cb2-5" title="5">        <span class="dt">&quot;server&quot;</span><span class="fu">:</span> <span class="st">&quot;https://veeam-server.example.com&quot;</span><span class="fu">,</span></a>
+<a class="sourceLine" id="cb2-6" title="6">        <span class="dt">&quot;client_id&quot;</span><span class="fu">:</span> <span class="st">&quot;YOUR_CLIENT_ID&quot;</span><span class="fu">,</span></a>
+<a class="sourceLine" id="cb2-7" title="7">        <span class="dt">&quot;client_secret&quot;</span><span class="fu">:</span> <span class="st">&quot;YOUR_CLIENT_SECRET&quot;</span><span class="fu">,</span></a>
+<a class="sourceLine" id="cb2-8" title="8">        <span class="dt">&quot;verify_ssl&quot;</span><span class="fu">:</span> <span class="kw">false</span><span class="fu">,</span></a>
+<a class="sourceLine" id="cb2-9" title="9">        <span class="dt">&quot;retry&quot;</span><span class="fu">:</span> <span class="fu">{</span></a>
+<a class="sourceLine" id="cb2-10" title="10">            <span class="dt">&quot;max_attempts&quot;</span><span class="fu">:</span> <span class="dv">3</span><span class="fu">,</span></a>
+<a class="sourceLine" id="cb2-11" title="11">            <span class="dt">&quot;delay_seconds&quot;</span><span class="fu">:</span> <span class="dv">5</span></a>
+<a class="sourceLine" id="cb2-12" title="12">        <span class="fu">}</span></a>
+<a class="sourceLine" id="cb2-13" title="13">    <span class="fu">},</span></a>
+<a class="sourceLine" id="cb2-14" title="14">    </a>
+<a class="sourceLine" id="cb2-15" title="15">    <span class="dt">&quot;cmdbuild&quot;</span><span class="fu">:</span> <span class="fu">{</span></a>
+<a class="sourceLine" id="cb2-16" title="16">        <span class="dt">&quot;url&quot;</span><span class="fu">:</span> <span class="st">&quot;https://cmdbuild-server.example.com/api&quot;</span><span class="fu">,</span></a>
+<a class="sourceLine" id="cb2-17" title="17">        <span class="dt">&quot;username&quot;</span><span class="fu">:</span> <span class="st">&quot;admin&quot;</span><span class="fu">,</span></a>
+<a class="sourceLine" id="cb2-18" title="18">        <span class="dt">&quot;password&quot;</span><span class="fu">:</span> <span class="st">&quot;admin&quot;</span><span class="fu">,</span></a>
+<a class="sourceLine" id="cb2-19" title="19">        <span class="dt">&quot;verify_ssl&quot;</span><span class="fu">:</span> <span class="kw">true</span></a>
+<a class="sourceLine" id="cb2-20" title="20">    <span class="fu">},</span></a>
+<a class="sourceLine" id="cb2-21" title="21">    </a>
+<a class="sourceLine" id="cb2-22" title="22">    <span class="dt">&quot;logging&quot;</span><span class="fu">:</span> <span class="fu">{</span></a>
+<a class="sourceLine" id="cb2-23" title="23">        <span class="dt">&quot;level&quot;</span><span class="fu">:</span> <span class="st">&quot;INFO&quot;</span><span class="fu">,</span></a>
+<a class="sourceLine" id="cb2-24" title="24">        <span class="dt">&quot;file&quot;</span><span class="fu">:</span> <span class="st">&quot;/var/log/VeeamConnector/connector.log&quot;</span><span class="fu">,</span></a>
+<a class="sourceLine" id="cb2-25" title="25">        <span class="dt">&quot;max_size&quot;</span><span class="fu">:</span> <span class="dv">10485760</span><span class="fu">,</span></a>
+<a class="sourceLine" id="cb2-26" title="26">        <span class="dt">&quot;backup_count&quot;</span><span class="fu">:</span> <span class="dv">5</span><span class="fu">,</span></a>
+<a class="sourceLine" id="cb2-27" title="27">        <span class="dt">&quot;format&quot;</span><span class="fu">:</span> <span class="st">&quot;%(asctime)s - %(name)s - %(levelname)s - %(message)s&quot;</span></a>
+<a class="sourceLine" id="cb2-28" title="28">    <span class="fu">}</span></a>
+<a class="sourceLine" id="cb2-29" title="29"><span class="fu">}</span></a></code></pre></div>
+<h2 id="integrazione-con-cmdbuild">Integrazione con CMDBuild</h2>
+<h3 id="classi-aggiornate">Classi Aggiornate</h3>
+<ol type="1">
+<li><strong>Infrastructure</strong>
+<ul>
+<li>Rappresenta l’infrastruttura Veeam</li>
+<li>Attributi:
+<ul>
+<li>Code: Identificativo univoco</li>
+<li>Name: Nome descrittivo</li>
+<li>Type: “VeeamBackup”</li>
+<li>Status: Stato attivo/inattivo</li>
+</ul></li>
+</ul></li>
+<li><strong>Proxy Server</strong> (VirtualServer o PhysicalServer)
+<ul>
+<li>Logica di identificazione:
+<ol type="1">
+<li>Ricerca in VirtualServer esistenti</li>
+<li>Ricerca in PhysicalServer esistenti</li>
+<li>Creazione nuovo PhysicalServer se non trovato</li>
+</ol></li>
+<li>Attributi aggiornati:
+<ul>
+<li>Type: “VeeamProxy”</li>
+<li>Status: Stato attuale</li>
+<li>LastUpdate: Data aggiornamento</li>
+</ul></li>
+</ul></li>
+<li><strong>Storage</strong> (Repository)
+<ul>
+<li>Attributi:
+<ul>
+<li>Code: ID repository</li>
+<li>Name: Nome repository</li>
+<li>Type: “VeeamRepository”</li>
+<li>Capacity: Capacità totale</li>
+<li>FreeSpace: Spazio disponibile</li>
+</ul></li>
+</ul></li>
+<li><strong>BackupJob</strong>
+<ul>
+<li>Attributi:
+<ul>
+<li>Code: ID job</li>
+<li>Name: Nome job</li>
+<li>Type: Tipo backup</li>
+<li>Status: Stato</li>
+<li>LastRun: Ultima esecuzione</li>
+<li>NextRun: Prossima esecuzione</li>
+</ul></li>
+</ul></li>
+<li><strong>VirtualServer</strong> (VM Backuppate)
+<ul>
+<li>Attributi:
+<ul>
+<li>Code: ID VM</li>
+<li>Hostname: Nome VM</li>
+<li>Status: Stato</li>
+<li>LastBackup: Ultimo backup</li>
+<li>BackupJob: Riferimento al job</li>
+</ul></li>
+</ul></li>
+</ol>
+<h3 id="relazioni">Relazioni</h3>
+<ol type="1">
+<li><strong>InfrastructureCI</strong>
+<ul>
+<li>Infrastructure → Storage</li>
+<li>Infrastructure → VirtualServer/PhysicalServer</li>
+<li>Infrastructure → VirtualServer (VM)</li>
+</ul></li>
+<li><strong>CIDependency</strong>
+<ul>
+<li>BackupJob → Storage</li>
+<li>VirtualServer → PhysicalServer</li>
+</ul></li>
+</ol>
+<h2 id="flusso-di-esecuzione">Flusso di Esecuzione</h2>
+<ol type="1">
+<li><p><strong>Inizializzazione</strong></p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><a class="sourceLine" id="cb3-1" title="1"><span class="co"># Carica configurazione</span></a>
+<a class="sourceLine" id="cb3-2" title="2">config <span class="op">=</span> load_config()</a>
+<a class="sourceLine" id="cb3-3" title="3"></a>
+<a class="sourceLine" id="cb3-4" title="4"><span class="co"># Configura logging</span></a>
+<a class="sourceLine" id="cb3-5" title="5">setup_logging(config)</a>
+<a class="sourceLine" id="cb3-6" title="6"></a>
+<a class="sourceLine" id="cb3-7" title="7"><span class="co"># Inizializza client</span></a>
+<a class="sourceLine" id="cb3-8" title="8">veeam_client <span class="op">=</span> VeeamClient(config)</a>
+<a class="sourceLine" id="cb3-9" title="9">cmdb_client <span class="op">=</span> CMDBuildClient(config)</a></code></pre></div></li>
+<li><p><strong>Recupero Dati Veeam</strong></p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><a class="sourceLine" id="cb4-1" title="1">inventory <span class="op">=</span> veeam_client.get_full_inventory()</a>
+<a class="sourceLine" id="cb4-2" title="2"><span class="co"># Contiene: proxies, repositories, backup_jobs</span></a></code></pre></div></li>
+<li><p><strong>Sincronizzazione CMDBuild</strong></p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><a class="sourceLine" id="cb5-1" title="1"><span class="co"># Crea/aggiorna infrastruttura</span></a>
+<a class="sourceLine" id="cb5-2" title="2">infrastructure <span class="op">=</span> cmdb_client.get_infrastructure()</a>
+<a class="sourceLine" id="cb5-3" title="3"></a>
+<a class="sourceLine" id="cb5-4" title="4"><span class="co"># Sincronizza componenti</span></a>
+<a class="sourceLine" id="cb5-5" title="5">cmdb_client.sync_veeam_inventory(inventory)</a></code></pre></div></li>
+</ol>
+<h2 id="gestione-errori">Gestione Errori</h2>
+<ol type="1">
+<li><strong>Retry Automatico</strong>
+<ul>
+<li>Configurabile in config.json</li>
+<li>Ritenta le operazioni fallite</li>
+<li>Logging dettagliato degli errori</li>
+</ul></li>
+<li><strong>Validazione Dati</strong>
+<ul>
+<li>Verifica schema prima dell’inserimento</li>
+<li>Controllo tipi di dati</li>
+<li>Gestione valori mancanti</li>
+</ul></li>
+<li><strong>Logging</strong>
+<ul>
+<li>Rotazione automatica dei log</li>
+<li>Livelli di logging configurabili</li>
+<li>Tracciamento completo delle operazioni</li>
+</ul></li>
+</ol>
+<h2 id="manutenzione">Manutenzione</h2>
+<h3 id="installazione">Installazione</h3>
+<div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><a class="sourceLine" id="cb6-1" title="1"><span class="co"># Clona il repository</span></a>
+<a class="sourceLine" id="cb6-2" title="2"><span class="fu">git</span> clone <span class="op">&lt;</span>repository-url<span class="op">&gt;</span></a>
+<a class="sourceLine" id="cb6-3" title="3"></a>
+<a class="sourceLine" id="cb6-4" title="4"><span class="co"># Installa dipendenze</span></a>
+<a class="sourceLine" id="cb6-5" title="5"><span class="ex">pip</span> install -r requirements.txt</a>
+<a class="sourceLine" id="cb6-6" title="6"></a>
+<a class="sourceLine" id="cb6-7" title="7"><span class="co"># Configura config.json</span></a>
+<a class="sourceLine" id="cb6-8" title="8"><span class="fu">cp</span> config/config.example.json config/config.json</a>
+<a class="sourceLine" id="cb6-9" title="9"><span class="ex">vim</span> config/config.json</a>
+<a class="sourceLine" id="cb6-10" title="10"></a>
+<a class="sourceLine" id="cb6-11" title="11"><span class="co"># Configura crontab</span></a>
+<a class="sourceLine" id="cb6-12" title="12"><span class="ex">0</span> 2 * * * /path/to/bin/sync_inventory.py</a></code></pre></div>
+<h3 id="monitoraggio">Monitoraggio</h3>
+<ul>
+<li>Controllare i log in /var/log/VeeamConnector/connector.log</li>
+<li>Verificare lo stato delle sincronizzazioni</li>
+<li>Monitorare lo spazio su disco per i log</li>
+</ul>
+<h3 id="troubleshooting">Troubleshooting</h3>
+<ol type="1">
+<li><strong>Errori di Connessione</strong>
+<ul>
+<li>Verificare configurazione SSL</li>
+<li>Controllare credenziali</li>
+<li>Verificare connettività di rete</li>
+</ul></li>
+<li><strong>Errori di Sincronizzazione</strong>
+<ul>
+<li>Controllare log per dettagli</li>
+<li>Verificare permessi CMDBuild</li>
+<li>Controllare schema dati</li>
+</ul></li>
+<li><strong>Problemi di Performance</strong>
+<ul>
+<li>Regolare batch_size in configurazione</li>
+<li>Ottimizzare scheduling crontab</li>
+<li>Monitorare utilizzo risorse</li>
+</ul></li>
+</ol>
+<h3 id="best-practices">Best Practices</h3>
+<ol type="1">
+<li><strong>Backup Configurazione</strong>
+<ul>
+<li>Mantenere backup di config.json</li>
+<li>Documentare modifiche alla configurazione</li>
+<li>Versionare le personalizzazioni</li>
+</ul></li>
+<li><strong>Monitoraggio Proattivo</strong>
+<ul>
+<li>Implementare alert su errori</li>
+<li>Verificare regolarmente i log</li>
+<li>Controllare spazio su disco</li>
+</ul></li>
+<li><strong>Manutenzione Regolare</strong>
+<ul>
+<li>Aggiornare dipendenze Python</li>
+<li>Ruotare/archiviare log vecchi</li>
+<li>Verificare performance</li>
+</ul></li>
+</ol>
+<hr />
+<p>Per supporto o problemi: 1. Consultare i log 2. Verificare la configurazione 3. Contattare l’amministratore di sistema</p>
